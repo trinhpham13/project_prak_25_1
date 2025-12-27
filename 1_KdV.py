@@ -29,15 +29,15 @@ class PINN(nn.Module):
             inputs = self.activation(layer(inputs))
         return self.layers[-1](inputs)
 
-# Problem parameters
+
 L, T = 5.0, 1.0
 N_eq, N_ic, N_bc = 10000, 500, 500
 
-# Exact soliton solution for KdV equation (c=1, x0=0)
+
 def exact_soliton(x, t):
     return 0.5 / torch.cosh(0.5 * (x - t))**2
 
-# Loss function for KdV equation
+# Loss function
 def loss_function(model, x_eq, t_eq, x_ic, t_ic, x_bc, t_bc):
     x_eq = x_eq.requires_grad_(True)
     t_eq = t_eq.requires_grad_(True)
@@ -84,7 +84,7 @@ def evaluate_model(model, device):
 # device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# List of architectures to test
+
 architectures = [
     [2, 20, 20, 1],
     [2, 50, 50, 1],
@@ -95,7 +95,7 @@ architectures = [
 
 results = {}
 
-# Train each architecture
+
 for arch in architectures:
     arch_key = "-".join(map(str, arch))
     print(f"\nTraining architecture: {arch_key}")
@@ -103,7 +103,7 @@ for arch in architectures:
     model = PINN(arch, activation='tanh').to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    # Generate training points
+  
     x_eq = (torch.rand(N_eq, 1, device=device) * 2*L - L)
     t_eq = torch.rand(N_eq, 1, device=device) * T
     x_ic = (torch.rand(N_ic, 1, device=device) * 2*L - L)
@@ -126,7 +126,7 @@ for arch in architectures:
     torch.save(model.state_dict(), f"models/model_kdv_arch_{arch_key}.pth")
     print(f"   MSE: {mse:.2e} | Training time: {train_time:.2f} seconds")
 
-# Save results to JSON
+
 with open("results/kdv_architecture_results.json", "w") as f:
     json.dump(results, f, indent=4)
 

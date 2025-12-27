@@ -19,19 +19,19 @@ class PINN(torch.nn.Module):
             inputs = self.activation(layer(inputs))
         return self.layers[-1](inputs)
 
-# Problem parameters
+
 L, T = 5.0, 1.0
 device = torch.device("cpu")
 
-# Exact soliton solution
+
 def exact_soliton(x, t):
     return 0.5 / torch.cosh(0.5 * (x - t))**2
 
-# Load results
+
 with open("results/kdv_architecture_results.json", "r") as f:
     results = json.load(f)
 
-# Process architecture info
+
 arch_data = []
 for key, res in results.items():
     layers = list(map(int, key.split("-")))
@@ -41,7 +41,7 @@ for key, res in results.items():
 
 arch_data.sort(key=lambda x: x[0])
 
-# Plot performance metrics
+
 params, depths, mses, times, _, _ = zip(*arch_data)
 
 plt.figure(figsize=(12, 5))
@@ -64,7 +64,7 @@ os.makedirs("grafs", exist_ok=True)
 plt.savefig("grafs/kdv_architecture_comparison.png", dpi=200, bbox_inches='tight')
 plt.show()
 
-# Plot solution for each architecture
+
 x_test = np.linspace(-L, L, 200)
 t_test = np.linspace(0, T, 50)
 X, T_mesh = np.meshgrid(x_test, t_test)
