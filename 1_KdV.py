@@ -9,7 +9,7 @@ os.makedirs("models", exist_ok=True)
 os.makedirs("results", exist_ok=True)
 
 
-# Define Physics-Informed Neural Network (PINN)
+# --- PINN model ---
 class PINN(nn.Module):
     def __init__(self, layers, activation='tanh'):
         super().__init__()
@@ -29,15 +29,13 @@ class PINN(nn.Module):
             inputs = self.activation(layer(inputs))
         return self.layers[-1](inputs)
 
-
+# --- Problem parameters ---
 L, T = 5.0, 1.0
-N_eq, N_ic, N_bc = 10000, 500, 500
-
+N_eq, N_ic, N_bc = 5000, 500, 500
 
 def exact_soliton(x, t):
     return 0.5 / torch.cosh(0.5 * (x - t))**2
 
-# Loss function
 def loss_function(model, x_eq, t_eq, x_ic, t_ic, x_bc, t_bc):
     x_eq = x_eq.requires_grad_(True)
     t_eq = t_eq.requires_grad_(True)
@@ -66,10 +64,8 @@ def loss_function(model, x_eq, t_eq, x_ic, t_ic, x_bc, t_bc):
     loss_bc_neumann = torch.mean(u_x_bc_left**2)
     
     loss_bc = loss_bc_dirichlet + loss_bc_neumann
-
     return loss_eq + 10.0 * loss_ic + 10.0 * loss_bc
 
-# on grid
 def evaluate_model(model, device):
     x_test = np.linspace(-L, L, 200)
     t_test = np.linspace(0, T, 50)
@@ -81,36 +77,40 @@ def evaluate_model(model, device):
     u_exact = exact_soliton(x_flat.cpu(), t_flat.cpu()).numpy()
     return np.mean((u_pred - u_exact) ** 2)
 
-# device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+print(f"Using device: {device}")
 
 architectures = [
     [2, 20, 20, 1],
     [2, 50, 50, 1],
     [2, 100, 100, 100, 1],
     [2, 200, 200, 1],
-    [2, 50, 50, 50, 50, 1],
+    [2, 50, 50, 50, 50, 1], 
 ]
 
 results = {}
 
-
-for arch in architectures:
+for idx, arch in enumerate(architectures):
     arch_key = "-".join(map(str, arch))
-    print(f"\nTraining architecture: {arch_key}")
+    print(f"\n[{idx+1}/{len(architectures)}] Training architecture: {arch_key}")
+    
+    if device.type != 'cpu':
+        torch.cuda.empty_cache() if device.type == 'cuda' else None
     
     model = PINN(arch, activation='tanh').to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-  
-    x_eq = (torch.rand(N_eq, 1, device=device) * 2*L - L)
+
+    x_eq = (torch.rand(N_eq, 1, device=device) * 2 * L - L)
     t_eq = torch.rand(N_eq, 1, device=device) * T
-    x_ic = (torch.rand(N_ic, 1, device=device) * 2*L - L)
+    x_ic = (torch.rand(N_ic, 1, device=device) * 2 * L - L)
     t_ic = torch.zeros(N_ic, 1, device=device)
     t_bc = torch.rand(N_bc, 1, device=device) * T
-    x_bc = torch.cat([-L * torch.ones(N_bc//2, 1, device=device), L * torch.ones(N_bc//2, 1, device=device)], dim=0)
-    t_bc = torch.cat([t_bc[:N_bc//2], t_bc[:N_bc//2]], dim=0)
+    x_bc = torch.cat([
+        -L * torch.ones(N_bc // 2, 1, device=device),
+         L * torch.ones(N_bc // 2, 1, device=device)
+    ], dim=0)
+    t_bc = torch.cat([t_bc[:N_bc // 2], t_bc[:N_bc // 2]], dim=0)
 
     start_time = time.time()
     for epoch in range(20001):
@@ -122,12 +122,13 @@ for arch in architectures:
 
     mse = evaluate_model(model, device)
     results[arch_key] = {"MSE": float(mse), "Training Time (s)": float(train_time)}
-    
     torch.save(model.state_dict(), f"models/model_kdv_arch_{arch_key}.pth")
-    print(f"   MSE: {mse:.2e} | Training time: {train_time:.2f} seconds")
+    
+    print(f"   → Completed. MSE: {mse:.2e} | Time: {train_time:.2f}s")
 
 
 with open("results/kdv_architecture_results.json", "w") as f:
     json.dump(results, f, indent=4)
 
-print("\nTraining complete. Results saved to: results/kdv_architecture_results.json")
+print("\nAll architectures trained successfully.")
+print("Results saved to: results/kdv_architecture_results.json")
